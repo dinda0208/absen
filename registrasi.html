@@ -1,0 +1,386 @@
+{% extends "base_admin.html" %}{% block title %}Registrasi Wajah{% endblock %}
+{% block content %} {% set siap = rows|selectattr('foto', 'ge',
+min_foto)|list|length %}
+<div class="pg-head">
+  <div>
+    <h1>Registrasi Wajah</h1>
+    <p>Ambil foto wajah karyawan, lalu latih model ResNet-50.</p>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-7">
+    <div class="sheet">
+      <div class="sheet-h">
+        <h2>Langkah 1: ambil foto wajah</h2>
+        <span class="hint">Target {{ jumlah }} foto per karyawan</span>
+      </div>
+      <div class="sheet-b">
+        <div class="picked none" id="picked">
+          <i class="bi bi-person-circle fs-4"></i
+          ><span id="pickedTxt">Pilih karyawan di daftar sebelah kanan.</span>
+        </div>
+
+        <div class="cam-box" id="cam">
+          <video id="video" playsinline muted></video>
+          <div class="idle">
+            <i class="bi bi-camera-video"></i><span>Kamera belum aktif</span>
+          </div>
+          <div class="oval"></div>
+          <div class="cue" id="cue">Lihat lurus ke kamera</div>
+        </div>
+
+        <div
+          class="bar mt-3"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-label="Progres foto"
+        >
+          <i id="bar"></i>
+        </div>
+        <div id="info" class="hint mt-2 mb-3">
+          Pilih karyawan, lalu tekan Mulai. Sistem mengambil {{ jumlah }} foto
+          otomatis.
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap">
+          <button id="btnStart" class="btn btn-velvet">
+            <i class="bi bi-camera me-1"></i> Mulai ambil foto
+          </button>
+          <button id="btnStop" class="btn btn-ghost" disabled>Berhenti</button>
+        </div>
+        <p class="hint mt-3 mb-0">
+          Selama pengambilan, ganti-ganti pose: lurus, tengok kiri, tengok
+          kanan, dongak, tunduk, senyum. Ulangi di cahaya berbeda (dengan atau
+          tanpa kacamata/masker) agar model lebih tangguh.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-5">
+    <div class="sheet mb-4">
+      <div class="sheet-h">
+        <h2>Pilih karyawan</h2>
+        <span class="hint">{{ rows|length }} karyawan</span>
+      </div>
+      <div class="picklist" id="picklist">
+        {% for r in rows %}
+        <label
+          class="pick"
+          data-kode="{{ r.kode_karyawan }}"
+          data-nama="{{ r.nama_lengkap }}"
+        >
+          <input type="radio" name="emp" value="{{ r.kode_karyawan }}" />
+          <span class="av c{{ loop.index0 % 5 }}"
+            >{{ r.nama_lengkap[:1]|upper }}</span
+          >
+          <span class="grow">
+            <b class="d-block lh-sm">{{ r.nama_lengkap }}</b>
+            <small class="muted"
+              ><span class="cnt">{{ r.foto }}</span> foto &middot; {{
+              r.kode_karyawan }}</small
+            >
+            <span class="meter d-block">
+              <i [style.width.%]="Math.min((r.foto / jumlah) * 100, 100)"></i>
+            </span>
+          </span>
+          <span class="text-end">
+            <span class="pill {{ 'ok' if r.wajah_terdaftar else 'off' }}"
+              >{{ 'Terdaftar' if r.wajah_terdaftar else 'Belum' }}</span
+            >
+            {% if r.foto %}
+            <span class="d-block mt-1"
+              ><button type="submit" form="reset-{{ r.id }}" class="mini-del">
+                hapus foto
+              </button></span
+            >
+            {% endif %}
+          </span>
+        </label>
+        {% else %}
+        <div class="empty">
+          <i class="bi bi-people"></i>Belum ada karyawan. Tambahkan dulu di menu
+          Kelola Karyawan.
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="sheet-h"><h2>Langkah 2: latih model ResNet-50</h2></div>
+      <div class="sheet-b">
+        <p class="hint">
+          Minimal 2 karyawan dengan &ge; {{ min_foto }} foto. Saat ini
+          <b>{{ siap }}</b> karyawan memenuhi syarat. Proses bisa beberapa menit
+          (lebih cepat dengan GPU). Jalankan setiap kali ada karyawan baru.
+        </p>
+        <button id="btnTrain" class="btn btn-velvet mb-3">
+          <i class="bi bi-cpu me-1"></i> Latih model
+        </button>
+        <div
+          class="bar"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-label="Progres training"
+        >
+          <i id="tbar"></i>
+        </div>
+        <div id="tinfo" class="hint mt-2">Belum ada proses training.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# form hapus foto dipisah dari label agar tidak bersarang #} {% for r in rows
+if r.foto %}
+<form
+  id="reset-{{ r.id }}"
+  method="post"
+  action="{{ url_for('registrasi_reset', kode=r.kode_karyawan) }}"
+  class="js-reset"
+  data-nama="{{ r.nama_lengkap }}"
+></form>
+{% endfor %} {% if metrics %}
+<div class="sheet mt-4" id="metrics">
+  <div class="sheet-h">
+    <h2>Hasil training terakhir</h2>
+    <span class="hint">{{ metrics.waktu }}</span>
+  </div>
+  <div
+    class="strip"
+    style="border: 0; border-radius: 0; border-bottom: 1px solid var(--line)"
+  >
+    <div>
+      <div class="lbl">Accuracy (test)</div>
+      <div class="num">{{ '%.2f'|format(metrics.test_accuracy*100) }}%</div>
+    </div>
+    <div>
+      <div class="lbl">Precision (macro)</div>
+      <div class="num">{{ '%.2f'|format(metrics.precision*100) }}%</div>
+    </div>
+    <div>
+      <div class="lbl">Recall (macro)</div>
+      <div class="num">{{ '%.2f'|format(metrics.recall*100) }}%</div>
+    </div>
+    <div>
+      <div class="lbl">F1-score (macro)</div>
+      <div class="num">{{ '%.2f'|format(metrics.f1*100) }}%</div>
+    </div>
+  </div>
+  <div class="sheet-b">
+    <p class="hint">
+      Data: train {{ metrics.jumlah_data.train }}, validasi {{
+      metrics.jumlah_data.val }}, test {{ metrics.jumlah_data.test }}. Durasi {{
+      metrics.durasi_detik }} detik. Gambar grafik juga tersimpan di folder
+      <code>ml/output/</code> untuk lampiran skripsi.
+    </p>
+    {% if metrics.sim_threshold is defined %}
+    <p class="hint">
+      Verifikasi wajah: ambang kemiripan {{ '%.3f'|format(metrics.sim_threshold)
+      }}, FAR (salah menerima) {{ '%.2f'|format(metrics.far*100) }}%, FRR (salah
+      menolak) {{ '%.2f'|format(metrics.frr*100) }}%.
+    </p>
+    {% endif %}
+    <div class="row g-3 mb-4">
+      <div class="col-md-7">
+        <img
+          class="img-fluid border rounded"
+          src="{{ url_for('model_file', filename='history.png') }}?t={{ metrics.waktu }}"
+          alt="Grafik accuracy dan loss"
+        />
+      </div>
+      <div class="col-md-5">
+        <img
+          class="img-fluid border rounded"
+          src="{{ url_for('model_file', filename='confusion_matrix.png') }}?t={{ metrics.waktu }}"
+          alt="Confusion matrix"
+        />
+      </div>
+    </div>
+    {% if metrics.per_kelas %}
+    <h3 class="fs-6 fw-bold mb-2">Hasil per karyawan (data test)</h3>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>ID karyawan</th>
+            <th>Precision</th>
+            <th>Recall</th>
+            <th>F1-score</th>
+            <th>Jumlah data uji</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for kode, v in metrics.per_kelas.items() %}
+          <tr>
+            <td>{{ kode }}</td>
+            <td class="t-num">{{ '%.1f'|format(v['precision']*100) }}%</td>
+            <td class="t-num">{{ '%.1f'|format(v['recall']*100) }}%</td>
+            <td class="t-num">{{ '%.1f'|format(v['f1-score']*100) }}%</td>
+            <td class="t-num">{{ v['support']|int }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %} {% endblock %} {% block scripts %}
+<script>
+  const TARGET = this.jumlah;
+  const POSES = [
+    "Lihat lurus ke kamera",
+    "Tengok sedikit ke kiri",
+    "Tengok sedikit ke kanan",
+    "Dongak sedikit",
+    "Tunduk sedikit",
+    "Tersenyum",
+  ];
+  const video = document.getElementById("video"),
+    cam = document.getElementById("cam"),
+    cue = document.getElementById("cue");
+  const bar = document.getElementById("bar"),
+    info = document.getElementById("info");
+  const btnStart = document.getElementById("btnStart"),
+    btnStop = document.getElementById("btnStop");
+  const picked = document.getElementById("picked"),
+    pickedTxt = document.getElementById("pickedTxt");
+  const radios = [...document.querySelectorAll('input[name="emp"]')];
+  let selected = "",
+    running = false;
+
+  function rowOf(kode) {
+    return document.querySelector(`.pick[data-kode="${CSS.escape(kode)}"]`);
+  }
+  function choose(kode) {
+    selected = kode;
+    document
+      .querySelectorAll(".pick")
+      .forEach((p) => p.classList.toggle("sel", p.dataset.kode === kode));
+    const row = rowOf(kode);
+    picked.classList.remove("none");
+    pickedTxt.innerHTML = `<b>${row.dataset.nama}</b> (${kode}) &middot; ${row.querySelector(".cnt").textContent} foto tersimpan`;
+  }
+  radios.forEach((r) => r.addEventListener("change", () => choose(r.value)));
+  const pre = new URLSearchParams(location.search).get("kode");
+  if (pre) {
+    const r = radios.find((x) => x.value === pre);
+    if (r) {
+      r.checked = true;
+      choose(pre);
+      r.closest(".pick").scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function setLocked(on) {
+    radios.forEach((r) => (r.disabled = on));
+    document
+      .querySelectorAll(".pick")
+      .forEach((p) => p.classList.toggle("locked", on));
+  }
+
+  btnStart.onclick = async () => {
+    if (!selected) {
+      alert("Pilih karyawan dulu.");
+      return;
+    }
+    try {
+      await startCamera(video);
+    } catch (e) {
+      alert(
+        "Kamera tidak bisa diakses: " +
+          e.message +
+          "\nPakai localhost atau HTTPS.",
+      );
+      return;
+    }
+    running = true;
+    btnStart.disabled = true;
+    btnStop.disabled = false;
+    setLocked(true);
+    cam.classList.add("live");
+    const row = rowOf(selected);
+    let saved = 0,
+      tries = 0;
+    while (running && saved < TARGET && tries < TARGET * 4) {
+      tries++;
+      const r = await postJSON("{{ url_for('registrasi_upload') }}", {
+        kode: selected,
+        image: captureFrame(video),
+      });
+      if (r.ok) saved++;
+      if (r.jumlah !== undefined) {
+        row.querySelector(".cnt").textContent = r.jumlah;
+        row.querySelector(".meter > i").style.width =
+          Math.min(100, (r.jumlah / TARGET) * 100) + "%";
+      }
+      const pose = POSES[Math.floor(saved / 10) % POSES.length];
+      bar.style.width = (saved / TARGET) * 100 + "%";
+      cue.textContent = r.ok
+        ? pose
+        : "Wajah belum terdeteksi, hadapkan ke kamera";
+      info.textContent =
+        `${pose} | tersimpan ${saved}/${TARGET}` +
+        (r.ok ? "" : " | wajah belum terdeteksi");
+      await sleep(300);
+    }
+    stopCamera(video);
+    running = false;
+    cam.classList.remove("live");
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+    setLocked(false);
+    info.textContent =
+      saved >= TARGET
+        ? `Selesai: ${saved} foto tersimpan. Lanjut latih model.`
+        : `Dihentikan: ${saved} foto tersimpan.`;
+    choose(selected);
+  };
+  btnStop.onclick = () => {
+    running = false;
+  };
+
+  document.querySelectorAll(".js-reset").forEach((f) =>
+    f.addEventListener("submit", (e) => {
+      if (!confirm(`Hapus semua foto ${f.dataset.nama}?`)) e.preventDefault();
+    }),
+  );
+  // tombol "hapus foto" ada di dalam label: cegah klik memilih baris
+  document
+    .querySelectorAll(".mini-del")
+    .forEach((b) => b.addEventListener("click", (e) => e.stopPropagation()));
+
+  // ---- training
+  const tbar = document.getElementById("tbar"),
+    tinfo = document.getElementById("tinfo"),
+    btnTrain = document.getElementById("btnTrain");
+  let sawRunning = false;
+  async function poll() {
+    const s = await (await fetch("{{ url_for('train_status') }}")).json();
+    tbar.style.width = s.percent + "%";
+    tinfo.textContent = s.message;
+    tinfo.className = "hint mt-2" + (s.state === "error" ? " text-danger" : "");
+    if (s.state === "running") {
+      sawRunning = true;
+      btnTrain.disabled = true;
+      setTimeout(poll, 2000);
+    } else {
+      btnTrain.disabled = false;
+      if (s.state === "done" && sawRunning)
+        setTimeout(() => location.reload(), 1200);
+    }
+  }
+  btnTrain.onclick = async () => {
+    const r = await postJSON("{{ url_for('train_start') }}");
+    if (!r.ok) {
+      alert(r.msg);
+    }
+    poll();
+  };
+  poll();
+</script>
+{% endblock %}

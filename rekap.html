@@ -1,0 +1,103 @@
+{% extends "base_karyawan.html" %}{% block title %}Rekap Absensi{% endblock %}
+{% block content %} {% set y = bulan[:4]|int %}{% set m = bulan[5:7]|int %} {%
+set py = y - 1 if m == 1 else y %}{% set pm = 12 if m == 1 else m - 1 %} {% set
+ny = y + 1 if m == 12 else y %}{% set nm = 1 if m == 12 else m + 1 %} {% set
+nama_bulan =
+['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][m
+- 1] %} {% set ns = namespace(tepat=0, telat=0) %} {% for r in rows %}{% if
+r.status == 'terlambat' %}{% set ns.telat = ns.telat + 1 %}{% else %}{% set
+ns.tepat = ns.tepat + 1 %}{% endif %}{% endfor %}
+
+<div class="hello">
+  <h1>Rekap Absensi Saya</h1>
+  <p>{{ nama_bulan }} {{ y }}</p>
+</div>
+
+<form class="sheet mb-3" method="get">
+  <div class="sheet-b">
+    <label class="form-label fw-semibold" for="bulan">Bulan</label>
+    <div class="mnav">
+      <a
+        class="btn btn-ghost"
+        href="{{ url_for('rekap_karyawan', bulan='%04d-%02d'|format(py, pm)) }}"
+        aria-label="Bulan sebelumnya"
+        ><i class="bi bi-chevron-left"></i
+      ></a>
+      <input
+        id="bulan"
+        type="month"
+        name="bulan"
+        value="{{ bulan }}"
+        class="form-control"
+        style="max-width: 200px"
+        required
+      />
+      <a
+        class="btn btn-ghost"
+        href="{{ url_for('rekap_karyawan', bulan='%04d-%02d'|format(ny, nm)) }}"
+        aria-label="Bulan berikutnya"
+        ><i class="bi bi-chevron-right"></i
+      ></a>
+      <button class="btn btn-velvet">Tampilkan</button>
+    </div>
+  </div>
+</form>
+
+<div class="kstrip mb-3" style="grid-template-columns: repeat(3, 1fr)">
+  <div>
+    <div class="lbl">Hadir</div>
+    <div class="num">{{ rows|length }}</div>
+  </div>
+  <div>
+    <div class="lbl">Tepat waktu</div>
+    <div class="num">{{ ns.tepat }}</div>
+  </div>
+  <div>
+    <div class="lbl">Terlambat</div>
+    <div class="num">{{ ns.telat }}</div>
+  </div>
+</div>
+
+<div class="sheet" style="overflow: hidden">
+  <table class="rtbl">
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>Tanggal</th>
+        <th>Masuk</th>
+        <th>Pulang</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="no muted" data-label="No">{{ loop.index }}</td>
+        <td class="tgl" data-label="Tanggal">{{ r.tanggal }}</td>
+        <td data-label="Masuk">{{ r.jam_masuk or '-' }}</td>
+        <td data-label="Pulang">
+          {% if r.jam_pulang %}{{ r.jam_pulang }}{% else %}<span class="muted"
+            >-</span
+          >{% endif %}
+        </td>
+        <td class="sts" data-label="Status">
+          <span class="pill {{ 'late' if r.status=='terlambat' else 'ok' }}"
+            >{{ r.status }}{% if r.menit_terlambat %} {{ r.menit_terlambat }}
+            menit{% endif %}</span
+          >
+          >
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="er">
+          <div class="empty">
+            <i class="bi bi-calendar-x"></i>Belum ada data absensi di bulan ini.
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

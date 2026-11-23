@@ -1,0 +1,228 @@
+{% extends "base_admin.html" %}{% block title %}Dashboard{% endblock %} {% block
+content %} {% set total = stat.total %} {% set hadir = stat.hadir %} {% set
+telat = stat.terlambat %} {% set tepat = [hadir - telat, 0]|max %} {% set belum
+= [total - hadir, 0]|max %} {% set C = 339.29 %} {% set pa = [(hadir / total *
+C) if total else 0, C]|min %} {% set pt = [(tepat / total * C) if total else 0,
+C]|min %} {% set pct = ((hadir / total * 100)|round|int) if total else 0 %}
+
+<div class="pg-head">
+  <div>
+    <h1>Dashboard</h1>
+    <p>Ringkasan absensi karyawan Mouvie Cafe hari ini.</p>
+  </div>
+  <a class="btn btn-velvet" href="{{ url_for('rekap_admin') }}"
+    ><i class="bi bi-table me-1"></i> Lihat rekap lengkap</a
+  >
+</div>
+
+<section class="ticket mb-4" aria-label="Ringkasan hari ini">
+  <div class="stub">
+    <div class="t-label">Hari ini</div>
+    <div class="t-date" id="tDate">&nbsp;</div>
+    <div class="t-clock" id="tClock">--:--:--</div>
+  </div>
+  <div class="t-main">
+    <div
+      class="ring"
+      role="img"
+      aria-label="{{ hadir }} dari {{ total }} karyawan sudah absen"
+    >
+      <svg width="132" height="132" viewBox="0 0 120 120">
+        <circle
+          cx="60"
+          cy="60"
+          r="54"
+          fill="none"
+          stroke="rgba(255,255,255,.16)"
+          stroke-width="10"
+        />
+        <circle
+          cx="60"
+          cy="60"
+          r="54"
+          fill="none"
+          stroke="#ff8f6b"
+          stroke-width="10"
+          stroke-linecap="butt"
+          stroke-dasharray="{{ '%.1f'|format(pa) }} {{ C }}"
+          transform="rotate(-90 60 60)"
+        />
+        <circle
+          cx="60"
+          cy="60"
+          r="54"
+          fill="none"
+          stroke="#f0b429"
+          stroke-width="10"
+          stroke-linecap="butt"
+          stroke-dasharray="{{ '%.1f'|format(pt) }} {{ C }}"
+          transform="rotate(-90 60 60)"
+        />
+      </svg>
+      <div class="c"><b>{{ pct }}%</b><span>sudah absen</span></div>
+    </div>
+    <ul class="legend">
+      <li><span class="dot d-ok"></span><b>{{ tepat }}</b> tepat waktu</li>
+      <li><span class="dot d-late"></span><b>{{ telat }}</b> terlambat</li>
+      <li><span class="dot d-none"></span><b>{{ belum }}</b> belum absen</li>
+    </ul>
+  </div>
+</section>
+
+<div class="strip mb-4">
+  <div>
+    <div class="lbl">Total karyawan</div>
+    <div class="num">{{ stat.total }}</div>
+    <div class="sub">terdaftar di sistem</div>
+  </div>
+  <div>
+    <div class="lbl">Absensi hari ini</div>
+    <div class="num">{{ stat.hadir }}</div>
+    <div class="sub">
+      {% if total %}{{ pct }}% dari seluruh karyawan{% else %}belum ada
+      karyawan{% endif %}
+    </div>
+  </div>
+  <div>
+    <div class="lbl">Terlambat hari ini</div>
+    <div class="num">{{ stat.terlambat }}</div>
+    <div class="sub">{{ tepat }} tepat waktu</div>
+  </div>
+  <div>
+    <div class="lbl">Wajah terdaftar</div>
+    <div class="num">{{ stat.wajah }}</div>
+    <div class="sub">
+      {% if total == 0 %}belum ada karyawan{% elif stat.wajah < total %}{{ total
+      - stat.wajah }} belum terdaftar{% else %}semua sudah terdaftar{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <div class="sheet">
+      <div class="sheet-h">
+        <h2>Absensi hari ini</h2>
+        <span class="hint">{{ hari_ini|length }} catatan</span>
+      </div>
+      <div class="tbl-wrap">
+        <div class="tbl-scroll">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Karyawan</th>
+                <th>Jabatan</th>
+                <th>Masuk</th>
+                <th>Pulang</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in hari_ini %}
+              <tr>
+                <td>
+                  <div class="who">
+                    <span class="av c{{ loop.index0 % 5 }}"
+                      >{{ r.nama_lengkap[:1]|upper }}</span
+                    >
+                    <div>
+                      <b>{{ r.nama_lengkap }}</b
+                      ><small>{{ r.kode_karyawan }}</small>
+                    </div>
+                  </div>
+                </td>
+                <td>{{ r.jabatan or '-' }}</td>
+                <td class="t-num">{{ r.jam_masuk or '-' }}</td>
+                <td class="t-num">
+                  {% if r.jam_pulang %}{{ r.jam_pulang }}{% else %}<span
+                    class="muted"
+                    >-</span
+                  >{% endif %}
+                </td>
+                <td>
+                  <span
+                    class="pill {{ 'late' if r.status=='terlambat' else 'ok' }}"
+                    >{{ r.status }}{% if r.menit_terlambat %} {{
+                    r.menit_terlambat }} menit{% endif %}</span
+                  >
+                  >
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="5">
+                  <div class="empty">
+                    <i class="bi bi-cup-hot"></i>Belum ada karyawan yang absen
+                    hari ini.
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="sheet">
+      <div class="sheet-h"><h2>Perlu ditindaklanjuti</h2></div>
+      {% if total == 0 %}
+      <a class="todo" href="{{ url_for('kelola_karyawan') }}"
+        ><i class="bi bi-person-plus"></i>
+        <div>
+          <b>Belum ada karyawan</b><small>Tambahkan karyawan pertama</small>
+        </div></a
+      >
+      {% elif stat.wajah < total %}
+      <a class="todo" href="{{ url_for('registrasi') }}"
+        ><i class="bi bi-person-bounding-box"></i>
+        <div>
+          <b>{{ total - stat.wajah }} karyawan belum terdaftar wajahnya</b
+          ><small>Ambil foto lalu latih model</small>
+        </div></a
+      >
+      {% else %}
+      <div class="todo">
+        <i class="bi bi-check2-circle"></i>
+        <div>
+          <b>Semua wajah sudah terdaftar</b
+          ><small>Tidak ada yang perlu dikerjakan</small>
+        </div>
+      </div>
+      {% endif %}
+      <a class="todo" href="{{ url_for('kelola_karyawan') }}"
+        ><i class="bi bi-people"></i>
+        <div>
+          <b>Kelola karyawan</b><small>Tambah atau hapus karyawan</small>
+        </div></a
+      >
+      <a class="todo" href="{{ url_for('rekap_admin') }}"
+        ><i class="bi bi-file-earmark-excel"></i>
+        <div>
+          <b>Ekspor rekap ke Excel</b><small>Filter tanggal dan karyawan</small>
+        </div></a
+      >
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  const tDate = document.getElementById("tDate"),
+    tClock = document.getElementById("tClock");
+  function tick() {
+    const n = new Date();
+    tClock.textContent = [n.getHours(), n.getMinutes(), n.getSeconds()]
+      .map((x) => String(x).padStart(2, "0"))
+      .join(":");
+    tDate.textContent = n.toLocaleDateString("id-ID", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  }
+  tick();
+  setInterval(tick, 1000);
+</script>
+{% endblock %}

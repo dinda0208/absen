@@ -1,0 +1,415 @@
+{% extends "base_admin.html" %}{% block title %}Kelola Karyawan{% endblock %} {%
+block content %}
+<div class="pg-head">
+  <div>
+    <h1>Kelola Karyawan</h1>
+    <p>
+      {{ n_karyawan }} karyawan dan {{ n_admin }} admin terdaftar di sistem.
+    </p>
+  </div>
+  <button
+    class="btn btn-velvet"
+    data-bs-toggle="modal"
+    data-bs-target="#modalTambah"
+  >
+    <i class="bi bi-person-plus me-1"></i> Tambah karyawan
+  </button>
+</div>
+
+<div class="sheet">
+  <div class="sheet-h">
+    <h2>Daftar karyawan</h2>
+    <div class="search" style="min-width: 260px">
+      <i class="bi bi-search"></i>
+      <input
+        id="cari"
+        class="form-control"
+        placeholder="Cari nama, ID, jabatan, username"
+        aria-label="Cari karyawan"
+      />
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Karyawan</th>
+          <th>Jabatan</th>
+          <th>Username</th>
+          <th>Foto</th>
+          <th>Wajah</th>
+          <th class="text-end">Aksi</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        {% for r in rows %}
+        <tr
+          data-q="{{ (r.kode_karyawan ~ ' ' ~ r.nama_lengkap ~ ' ' ~ (r.jabatan or '') ~ ' ' ~ r.username ~ (' admin' if r.role == 'admin' else ' karyawan'))|lower }}"
+        >
+          <td>
+            <div class="who">
+              <span
+                class="av {{ 'cadmin' if r.role == 'admin' else 'c' ~ (loop.index0 % 5) }}"
+                >{{ r.nama_lengkap[:1]|upper }}</span
+              >
+              <div>
+                <b
+                  >{{ r.nama_lengkap }}{% if r.role == 'admin' %}
+                  <span
+                    class="pill off"
+                    style="margin-left: 0.35rem; padding: 0.05rem 0.5rem"
+                    >Admin</span
+                  >{% endif %}</b
+                ><small>{{ r.kode_karyawan }}</small>
+              </div>
+            </div>
+          </td>
+          <td>{{ r.jabatan or '-' }}</td>
+          <td>{{ r.username }}</td>
+          {% if r.role == 'admin' %}
+          <td class="muted">-</td>
+          <td class="muted">-</td>
+          {% else %}
+          <td class="t-num">{{ r.foto }}</td>
+          <td>
+            <span class="pill {{ 'ok' if r.wajah_terdaftar else 'off' }}"
+              >{{ 'Terdaftar' if r.wajah_terdaftar else 'Belum' }}</span
+            >
+          </td>
+          {% endif %}
+          <td class="text-end text-nowrap">
+            {% if r.role != 'admin' %}
+            <a
+              class="btn btn-sm btn-ghost"
+              href="{{ url_for('registrasi') }}?kode={{ r.kode_karyawan }}"
+              title="Registrasi wajah"
+              ><i class="bi bi-person-bounding-box"></i
+            ></a>
+            {% endif %}
+            <button
+              type="button"
+              class="btn btn-sm btn-ghost"
+              title="Edit {{ 'admin' if r.role == 'admin' else 'karyawan' }}"
+              aria-label="Edit {{ r.nama_lengkap }}"
+              data-bs-toggle="modal"
+              data-bs-target="#modalEdit"
+              data-action="{{ url_for('edit_karyawan', uid=r.id) }}"
+              data-kode="{{ r.kode_karyawan }}"
+              data-role="{{ r.role }}"
+              data-nama="{{ r.nama_lengkap }}"
+              data-jabatan="{{ r.jabatan or '' }}"
+              data-username="{{ r.username }}"
+            >
+              <i class="bi bi-pencil-square"></i>
+            </button>
+            {% if r.role != 'admin' %}
+            <form
+              method="post"
+              action="{{ url_for('hapus_karyawan', uid=r.id) }}"
+              class="d-inline js-del"
+              data-nama="{{ r.nama_lengkap }}"
+            >
+              <button
+                class="btn btn-sm btn-ghost text-danger"
+                title="Hapus karyawan"
+                aria-label="Hapus {{ r.nama_lengkap }}"
+              >
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6">
+            <div class="empty">
+              <i class="bi bi-people"></i>Belum ada karyawan. Tambahkan karyawan
+              pertama lewat tombol di kanan atas.
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        <tr id="noResult" style="display: none">
+          <td colspan="6">
+            <div class="empty">
+              <i class="bi bi-search"></i>Tidak ada karyawan yang cocok dengan
+              pencarian.
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div
+  class="modal fade"
+  id="modalTambah"
+  tabindex="-1"
+  aria-labelledby="modalTambahLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" method="post">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5 fw-bold" id="modalTambahLabel">
+          Tambah karyawan baru
+        </h2>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Tutup"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-sm-5">
+            <label class="form-label" for="f-kode">ID karyawan</label>
+            <input
+              id="f-kode"
+              name="kode"
+              class="form-control"
+              placeholder="MV001"
+              required
+              maxlength="20"
+              pattern="[A-Za-z0-9_\-]{1,20}"
+              title="Huruf, angka, '-' dan '_' saja (maks 20 karakter)"
+            />
+          </div>
+          <div class="col-sm-7">
+            <label class="form-label" for="f-nama">Nama lengkap</label>
+            <input id="f-nama" name="nama" class="form-control" required />
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="f-jab">Jabatan</label>
+            <input
+              id="f-jab"
+              name="jabatan"
+              class="form-control"
+              placeholder="contoh: Barista"
+              required
+            />
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label" for="f-user">Username</label>
+            <input
+              id="f-user"
+              name="username"
+              class="form-control"
+              required
+              autocomplete="off"
+            />
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label" for="f-pw">Password</label>
+            <div class="input-group">
+              <input
+                id="f-pw"
+                name="password"
+                type="password"
+                class="form-control"
+                minlength="6"
+                required
+                autocomplete="new-password"
+              />
+              <button
+                class="btn btn-ghost"
+                type="button"
+                id="togglePw"
+                aria-label="Tampilkan password"
+              >
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+            <div class="hint mt-1">Minimal 6 karakter.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">
+          Batal
+        </button>
+        <button class="btn btn-velvet">Simpan karyawan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div
+  class="modal fade"
+  id="modalEdit"
+  tabindex="-1"
+  aria-labelledby="modalEditLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" method="post" id="formEdit">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5 fw-bold" id="modalEditLabel">
+          Edit karyawan
+        </h2>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Tutup"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-sm-5">
+            <label class="form-label" for="e-kode">ID karyawan</label>
+            <input
+              id="e-kode"
+              class="form-control"
+              readonly
+              tabindex="-1"
+              style="background: #f3f4f7"
+            />
+          </div>
+          <div class="col-sm-7">
+            <label class="form-label" for="e-nama">Nama lengkap</label>
+            <input id="e-nama" name="nama" class="form-control" required />
+          </div>
+          <div class="col-12 hint" id="e-hint" style="margin-top: -0.25rem">
+            ID tidak bisa diubah karena dipakai sebagai penanda foto wajah dan
+            model.
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="e-jab">Jabatan</label>
+            <input id="e-jab" name="jabatan" class="form-control" required />
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="e-user">Username</label>
+            <input
+              id="e-user"
+              name="username"
+              class="form-control"
+              required
+              autocomplete="off"
+            />
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="e-pw"
+              >Password baru
+              <span class="muted fw-normal">(opsional)</span></label
+            >
+            <div class="input-group">
+              <input
+                id="e-pw"
+                name="password"
+                type="password"
+                class="form-control"
+                minlength="6"
+                autocomplete="new-password"
+                placeholder="Kosongkan jika tidak diganti"
+              />
+              <button
+                class="btn btn-ghost"
+                type="button"
+                id="toggleEPw"
+                aria-label="Tampilkan password"
+              >
+                <i class="bi bi-eye"></i>
+              </button>
+              <button
+                class="btn btn-ghost"
+                type="button"
+                id="randPw"
+                title="Buat password acak"
+              >
+                <i class="bi bi-shuffle"></i> Acak
+              </button>
+            </div>
+            <div class="hint mt-1">
+              Lupa password? Isi password baru di sini (minimal 6 karakter),
+              lalu beri tahu pemilik akunnya. Password lama tidak bisa dilihat
+              karena disimpan terenkripsi.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">
+          Batal
+        </button>
+        <button class="btn btn-velvet">Simpan perubahan</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  // pencarian
+  const cari = document.getElementById("cari"),
+    rows = [...document.querySelectorAll("#tbody tr[data-q]")],
+    noRes = document.getElementById("noResult");
+  cari.addEventListener("input", () => {
+    const q = cari.value.trim().toLowerCase();
+    let n = 0;
+    rows.forEach((r) => {
+      const ok = r.dataset.q.includes(q);
+      r.style.display = ok ? "" : "none";
+      if (ok) n++;
+    });
+    noRes.style.display = rows.length && n === 0 ? "" : "none";
+  });
+  // konfirmasi hapus
+  document.querySelectorAll(".js-del").forEach((f) =>
+    f.addEventListener("submit", (e) => {
+      if (
+        !confirm(
+          `Hapus ${f.dataset.nama} beserta data absensi dan foto wajahnya?`,
+        )
+      )
+        e.preventDefault();
+    }),
+  );
+  // tampil/sembunyi password
+  const pw = document.getElementById("f-pw"),
+    tg = document.getElementById("togglePw");
+  tg.addEventListener("click", () => {
+    const show = pw.type === "password";
+    pw.type = show ? "text" : "password";
+    tg.innerHTML = `<i class="bi bi-eye${show ? "-slash" : ""}"></i>`;
+  });
+  // ---- edit karyawan / admin
+  const modalEdit = document.getElementById("modalEdit"),
+    formEdit = document.getElementById("formEdit");
+  const ePw = document.getElementById("e-pw"),
+    eTg = document.getElementById("toggleEPw");
+  modalEdit.addEventListener("show.bs.modal", (ev) => {
+    const d = ev.relatedTarget.dataset;
+    formEdit.action = d.action;
+    const isAdmin = d.role === "admin";
+    document.getElementById("modalEditLabel").textContent = isAdmin
+      ? "Edit admin"
+      : "Edit karyawan";
+    document.getElementById("e-hint").textContent = isAdmin
+      ? "ID admin tidak bisa diubah."
+      : "ID tidak bisa diubah karena dipakai sebagai penanda foto wajah dan model.";
+    document.getElementById("e-kode").value = d.kode;
+    document.getElementById("e-nama").value = d.nama;
+    document.getElementById("e-jab").value = d.jabatan;
+    document.getElementById("e-user").value = d.username;
+    ePw.value = "";
+    ePw.type = "password";
+    eTg.innerHTML = '<i class="bi bi-eye"></i>';
+  });
+  eTg.addEventListener("click", () => {
+    const show = ePw.type === "password";
+    ePw.type = show ? "text" : "password";
+    eTg.innerHTML = `<i class="bi bi-eye${show ? "-slash" : ""}"></i>`;
+  });
+  document.getElementById("randPw").addEventListener("click", () => {
+    const abc = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789",
+      buf = new Uint32Array(8);
+    crypto.getRandomValues(buf);
+    ePw.value = [...buf].map((n) => abc[n % abc.length]).join("");
+    ePw.type = "text";
+    eTg.innerHTML = '<i class="bi bi-eye-slash"></i>';
+  });
+</script>
+{% endblock %}

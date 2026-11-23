@@ -1,0 +1,113 @@
+{% extends "base_karyawan.html" %}{% block title %}Beranda{% endblock %} {%
+block content %}
+<div class="hello">
+  <h1>Halo, {{ u.nama_lengkap }}</h1>
+  <p id="sapa">Semoga harimu menyenangkan.</p>
+</div>
+
+<section class="pass" aria-label="Absensi hari ini">
+  <div class="top">
+    <div>
+      <div class="lbl">Absensi hari ini</div>
+      <div class="date" id="tgl">&nbsp;</div>
+    </div>
+    <div class="clock" id="jam" aria-hidden="true">--:--:--</div>
+  </div>
+  <div class="perf"></div>
+  <div class="times">
+    <div>
+      <div class="k">Masuk</div>
+      <div class="v {{ '' if absen else 'none' }}">
+        {{ absen.jam_masuk if absen else '--:--' }}
+      </div>
+    </div>
+    <div>
+      <div class="k">Pulang</div>
+      <div class="v {{ '' if absen and absen.jam_pulang else 'none' }}">
+        {{ absen.jam_pulang if absen and absen.jam_pulang else '--:--' }}
+      </div>
+    </div>
+    <div>
+      <div class="k">Status</div>
+      {% if absen %}<span
+        class="pill {{ 'late' if absen.status=='terlambat' else 'ok' }}"
+        >{{ absen.status }}{% if absen.menit_terlambat %} {{
+        absen.menit_terlambat }} menit{% endif %}</span
+      >
+      > {% else %}<span class="pill off">Belum absen</span>{% endif %}
+    </div>
+  </div>
+  <div class="rule">
+    Absen masuk {{ buka }} sampai {{ batas }}, lewat dari {{ batas }} dihitung
+    terlambat. Absen pulang {{ p_buka }} sampai {{ p_tutup }}.
+  </div>
+  <div class="foot">
+    {% if not u.wajah_terdaftar %}
+    <div class="note">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <div>
+        Wajah Anda belum terdaftar. Minta admin melakukan registrasi wajah dulu.
+      </div>
+    </div>
+    {% elif not absen or not absen.jam_pulang %}
+    <a href="{{ url_for('scan') }}" class="btn-cta"
+      ><i class="bi bi-camera"></i> Scan {{ 'absen pulang' if absen else 'absen
+      masuk' }}</a
+    >
+    {% else %}
+    <div class="note">
+      <i class="bi bi-check-circle-fill"></i>
+      <div>Absensi hari ini sudah lengkap. Terima kasih!</div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<div class="kstrip">
+  <div>
+    <div class="lbl">Hadir bulan ini</div>
+    <div class="num">{{ ringkas.hadir }}</div>
+  </div>
+  <div>
+    <div class="lbl">Terlambat bulan ini</div>
+    <div class="num">{{ ringkas.terlambat|int }}</div>
+  </div>
+</div>
+
+<div class="sheet profile">
+  <span class="av">{{ u.nama_lengkap[:1]|upper }}</span>
+  <div>
+    <b>{{ u.nama_lengkap }}</b
+    ><small>{{ u.jabatan or '-' }}, ID {{ u.kode_karyawan }}</small>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  const tgl = document.getElementById("tgl"),
+    jam = document.getElementById("jam"),
+    sapa = document.getElementById("sapa");
+  function tick() {
+    const n = new Date();
+    jam.textContent = [n.getHours(), n.getMinutes(), n.getSeconds()]
+      .map((x) => String(x).padStart(2, "0"))
+      .join(":");
+    tgl.textContent = n.toLocaleDateString("id-ID", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  }
+  const h = new Date().getHours();
+  sapa.textContent =
+    (h < 11
+      ? "Selamat pagi"
+      : h < 15
+        ? "Selamat siang"
+        : h < 18
+          ? "Selamat sore"
+          : "Selamat malam") + ". Semoga harimu menyenangkan.";
+  tick();
+  setInterval(tick, 1000);
+</script>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "base_karyawan.html" %}{% block title %}Scan Absen{% endblock %}
+{% block content %}
+{% set selesai = absen and absen.jam_pulang %}
+{% set aksi = 'absen pulang' if absen and absen.jam_masuk else 'absen masuk' %}
+<div class="hello">
+  <h1>Scan Absen</h1>
+  <p>{% if selesai %}Absensi hari ini sudah lengkap.{% elif absen and absen.jam_masuk %}Anda sudah masuk pukul {{ absen.jam_masuk }}. Scan untuk absen pulang.{% else %}Hadapkan wajah ke kamera untuk absen masuk.{% endif %}</p>
+</div>
+
+<div class="scan-wrap">
+  <div>
+    <div class="cam" id="cam">
+      <video id="video" playsinline muted></video>
+      <div class="oval"></div>
+      <div class="cue" id="cue">Posisikan wajah di dalam lingkaran</div>
+      <div class="busy-layer"><div class="spin"></div>Memproses wajah...</div>
+    </div>
+    <div class="scan-btn">
+      <button id="btnScan" class="btn-cta" {{ 'disabled' if (not u.wajah_terdaftar) or selesai }}>
+        <i class="bi bi-camera"></i> <span>Scan {{ aksi }}</span>
+      </button>
+    </div>
+    <div id="hasil" aria-live="polite">
+      {% if not u.wajah_terdaftar %}
+        <div class="result info"><i class="bi bi-exclamation-triangle-fill"></i><div><b>Wajah belum terdaftar</b>Hubungi admin untuk registrasi wajah.</div></div>
+      {% elif selesai %}
+        <div class="result ok"><i class="bi bi-check-circle-fill"></i><div><b>Absensi hari ini sudah lengkap</b>Masuk {{ absen.jam_masuk }}, pulang {{ absen.jam_pulang }}.</div></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="sheet">
+    <div class="sheet-h"><h2>Petunjuk</h2></div>
+    <div class="sheet-b">
+      <ol class="tips">
+        <li>Izinkan akses kamera di browser.</li>
+        <li>Hadapkan wajah ke kamera, usahakan cahaya cukup dan wajah tidak tertutup.</li>
+        <li>Tekan tombol scan dan tunggu hasilnya.</li>
+      </ol>
+      <p class="hint mb-0 mt-3">Scan pertama dalam sehari dicatat sebagai absen masuk, scan berikutnya sebagai absen pulang.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const video = document.getElementById("video"), btn = document.getElementById("btnScan"), out = document.getElementById("hasil");
+const cam = document.getElementById("cam"), cue = document.getElementById("cue");
+
+function box(cls, icon, title, body, pillText, pillCls) {
+  out.innerHTML = "";
+  const d = document.createElement("div"); d.className = "result " + cls;
+  d.innerHTML = `<i class="bi ${icon}"></i><div><b></b><span></span></div>`;
+  d.querySelector("b").textContent = title;
+  d.querySelector("span").textContent = body || "";
+  if (pillText) { const p = document.createElement("span"); p.className = "pill " + pillCls; p.textContent = pillText; p.style.marginTop = ".4rem"; p.style.display = "inline-flex"; d.querySelector("div").appendChild(p); }
+  out.appendChild(d);
+}
+
+startCamera(video)
+  .then(() => cam.classList.add("live"))
+  .catch(e => {
+    box("fail", "bi-camera-video-off-fill", "Kamera tidak bisa diakses", e.message + ". Gunakan localhost atau HTTPS.");
+    cue.textContent = "Kamera tidak aktif"; btn.disabled = true;
+  });
+
+btn.onclick = async () => {
+  btn.disabled = true; cam.classList.add("busy");
+  out.innerHTML = '<div class="result info"><i class="bi bi-hourglass-split"></i><div><b>Memproses wajah...</b></div></div>';
+  let r;
+  try { r = await postJSON("{{ url_for('scan_proses') }}", { image: captureFrame(video) }); }
+  catch (e) { r = { ok: false, msg: "Gagal menghubungi server. Coba lagi." }; }
+  cam.classList.remove("busy");
+  if (r.ok) {
+    const st = r.status || null;
+    box("ok", "bi-check-circle-fill", r.msg, `Jam ${r.jam}, kecocokan ${r.conf}%`, st, st === "terlambat" ? "late" : "ok");
+    cue.textContent = "Berhasil. Kembali ke beranda...";
+    setTimeout(() => location.href = "{{ url_for('beranda') }}", 2500);
+  } else {
+    box("fail", "bi-x-circle-fill", r.msg);
+    btn.disabled = false;
+  }
+};
+</script>
+{% endblock %}
